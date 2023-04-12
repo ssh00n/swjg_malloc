@@ -45,11 +45,10 @@ team_t team = {
 #define HDRP(bp)  ((char *)(bp) - WSIZE)
 #define FTRP(bp)  ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
-/* Given block ptr bp, compute address of next and previous blocks. */
 #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
 #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE((void *)(bp) - DSIZE))
 
-/*Pointer to get NEXT and PREVIOUS pointer of free_list*/
+/*Pointer to get NEXT and PREV pointer of free_list*/
 #define PREV_PTR(p)  (*(char **)(p + WSIZE))
 #define NEXT_PTR(p)  (*(char **)(p))
 
@@ -57,7 +56,7 @@ team_t team = {
 
 char* heap_listp = 0;
 
-// segregated free list
+// Segregated free list
 static char* seg_list[SEG_MAX_SIZE];  
 
 static void *coalesce(void *bp);
@@ -101,8 +100,8 @@ static void *extend_heap(size_t words){
 
 int find_free_idx(size_t size){
     for (int idx = 0; idx<=8; idx++) {
-        if (size <= (1 << (idx+4)))
-            return idx;
+        if (size <= (1 << (idx+4)))         // idx : 0 = 2**4 ~ idx : 9 = 2**12
+            return idx;                     
     }
     return SEG_MAX_SIZE - 1;        // index of 2**12 ~ inf
 }
@@ -136,14 +135,14 @@ void free_list_delete(void* ptr){
     size_t size = GET_SIZE(HDRP(ptr));
     int idx = find_free_idx(size);
 
-    if (seg_list[idx] == ptr){
+    // Delete - Case 1 : Free block linked with root
+    if (seg_list[idx] == ptr){      
         seg_list[idx] = NEXT_PTR(ptr);
     }
 
     // Delete - Case 2 : Free block not linked with root
     else{   
         NEXT_PTR(PREV_PTR(ptr)) = NEXT_PTR(ptr);
-
         if (NEXT_PTR(ptr) != heap_listp){
             PREV_PTR(NEXT_PTR(ptr)) = PREV_PTR(ptr);
         }
@@ -154,7 +153,7 @@ void free_list_delete(void* ptr){
 void place(void* bp, size_t asize){
     size_t oldsize = GET_SIZE(HDRP(bp));
     
-    free_list_delete(bp);       // find proper block -> delete free block in seg list
+    free_list_delete(bp);       // Find proper block -> delete free block in seg list
 
     if ((oldsize - asize) >= 2*DSIZE){          
         PUT(HDRP(bp), PACK(asize, 1));
@@ -218,15 +217,14 @@ static void *coalesce(void *bp)
 
 void *mm_malloc(size_t size)
 {
-    size_t asize;   /* Adjusted block size */
+    size_t asize;       /* Adjusted block size */
     size_t extendsize;  /* Amount to extend heap if no fit */
     char *bp;
 
-    /* Ignore spurious requests */
     if (size == 0)
         return NULL;
 
-    /* Adjust block size to include overhead and alignment reqs. */
+    /* Adjust block size to include header + payload + footer */
     if (size <= DSIZE)
         asize = 2*DSIZE;
     else
@@ -238,7 +236,7 @@ void *mm_malloc(size_t size)
         return bp;
     }
 
-    /* No fit found. Get more memory and place the block */
+    /* No fit found. extend and place the block */
     extendsize = MAX(asize, CHUNKSIZE);
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;
